@@ -15,44 +15,55 @@ int8_t mode=0,hang=1;
 
 uint8_t anjian(void)
 {
-    if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_15) == 0) return 0;
+    if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_15) == 0) return 15;
 	if (GPIO_ReadInputDataBit(GPIOA, GPIO_Pin_1) == 0) return 1;
-	if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 0) return 2;
-    return 3;
+	if (GPIO_ReadInputDataBit(GPIOC, GPIO_Pin_13) == 0) return 13;
+    return 0;
 }
 
 void xianshi(void)
 {
 	if(mode==0 && hang==1)
 	{
+		OLED_Clear();
 		OLED_ShowString(1,1,">speed control");
 		OLED_ShowString(2,1,"motor control");
 	}else if(mode==0 && hang==2)
 	{
+		OLED_Clear();
 		OLED_ShowString(1,1,"speed control");
 		OLED_ShowString(2,1,">motor control");
-	}else if(mode==1 && hang==1)OLED_ShowNum(1,1,basespeed,3);
-	else if(mode==1 && hang==2)OLED_ShowString(1,1,"motor control E");
+	}else if(mode==1 && hang==1)
+	{
+		OLED_Clear();
+		OLED_ShowNum(1,1,basespeed,3);
+	}
+	else if(mode==1 && hang==2)
+	{
+		OLED_Clear();
+		OLED_ShowString(1,1,"motor control E");
+	}
+	keynum=0;
 }
 
 void anjian1(void)
 {
     static uint8_t count = 0;
-    static uint8_t last_state = 3;
-    static uint8_t current_state = 3;
+    static uint8_t last_key = 3;
     
     count++;
-    if(count >= 2) 
+    if(count >= 2)  // 改为20ms检测一次
     {
         count = 0;
         
-        last_state = current_state;
-        current_state = anjian();  
+        uint8_t current_key = anjian();
         
-        // 检测按键按下（从无按键到有按键）
-        if(last_state == 3 && current_state != 3) {
-            keynum = current_state;
+        // 直接检测当前按键状态，但去抖动
+        if(current_key != 0 && last_key ==0 ) {
+            keynum = current_key;
         }
+        
+        last_key = current_key;
     }
 }
 
@@ -60,7 +71,6 @@ uint8_t keyget(void)
 {
 	uint8_t t;
 	t=keynum;
-	keynum=3;
 	return t;
 }
 
@@ -76,31 +86,23 @@ void TIM4_IRQHandler(void)
 
 void botton(void)
 {
-	if(keyget()==0 && mode==0 && hang==1)
+	if(keyget()==15 && mode==0)
 	{
 		mode=1;
 		xianshi();
-	}else if(keyget()==0 && mode==0 && hang==2)
-	{
-		mode=1;
-		xianshi();
-	}else if(keyget()==1 && mode==1 && hang==2)
+	}else if(keyget()==1 && mode==1 )
 	{
 		mode=0;
 		xianshi();
-	}else if(keyget()==1 && mode==1 && hang==1)
-	{
-		mode=0;
-		xianshi();
-	}else if(keyget()==2 && mode==0 && hang==2)
+	}else if(keyget()==13 && mode==0 && hang==2)
 	{
 		hang=1;
 		xianshi();
-	}else if(keyget()==2 && mode==0 && hang==1)
+	}else if(keyget()==13 && mode==0 && hang==1)
 	{
 		hang=2;
 		xianshi();
-	}else if(keyget()==2 && mode==1 && hang==1)
+	}else if(keyget()==13 && mode==1 && hang==1)
 	{
 		basespeed+=5;
 		xianshi();
@@ -122,6 +124,11 @@ int main(void)
 	error0=0;
 	error1=0;
 	errorint=0;
+	// 明确初始化显示
+	OLED_Clear();
+	mode = 0;
+	hang = 1;
+	xianshi();  // 显示正确的初始菜单
 	
 	while (1)
 	{
@@ -162,8 +169,8 @@ int main(void)
 			if(leftspeed<-100)leftspeed=-100;
 			if(rightspeed<-100)rightspeed=-100;
 			if(rightspeed>100)rightspeed=100;
-			Motor_SetSpeed1(leftspeed);
-			Motor_SetSpeed2(rightspeed);
+			Motor_SetSpeed2(leftspeed);
+			Motor_SetSpeed1(rightspeed);
 			Delay_ms(5);
 		}
 	}
